@@ -111,12 +111,12 @@ python scripts/minimal_qa.py \
 
 当前正式实验主线是本地低算力小模型实验：
 
-1. 先做 `train 1000 / dev 300 / epoch 1` 的小规模预实验。
+1. 先做 `train 1000 / dev 300 / epoch 1` 的模型筛选预实验，这一步不是最终主实验。
 2. 对比三个小型中文 RoBERTa 模型：
    - `uer/chinese_roberta_L-2_H-128`
    - `uer/chinese_roberta_L-4_H-256`
    - `uer/chinese_roberta_L-4_H-512`
-3. 根据预实验结果选择 1-2 个模型扩大训练规模。
+3. 根据模型筛选结果选择 1-2 个模型扩大训练规模，进入正式主实验。
 4. 最终比较 F1、EM、训练耗时、推理耗时和模型大小。
 
 详细实验设计见：
