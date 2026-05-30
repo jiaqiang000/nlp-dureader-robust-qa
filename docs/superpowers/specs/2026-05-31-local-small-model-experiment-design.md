@@ -1,87 +1,75 @@
-# Local Small-Model DuReader Experiment Design
+# 本地小模型 DuReader 实验设计
 
-## Purpose
+## 目标
 
-This stage turns the current runnable QA chain into a formal local low-compute
-experiment for the NLP course paper. The experiment should answer:
+本阶段把已经跑通的最小 QA 链路，推进为结课论文可使用的正式本地低算力实验。实验要回答的问题是：
 
-> Under local M1 Pro compute constraints, how do small Chinese pretrained
-> language models trade off QA accuracy, training time, inference time, and model
-> size on DuReader_robust?
+> 在本地 M1 Pro 算力约束下，不同规模的小型中文预训练语言模型在 DuReader_robust 上如何权衡 QA 准确率、训练耗时、推理耗时和模型大小？
 
-The goal is not leaderboard performance. The goal is a reproducible, defensible
-course experiment that fits the selected topic: local, low-compute Chinese QA.
+本阶段目标不是冲榜，也不是追求最高分，而是完成一个可复现、可解释、符合课程要求的本地中文 QA 实验。
 
-## Confirmed Mainline
+## 已确认主线
 
-- Task: extractive question answering / machine reading comprehension.
-- Dataset: DuReader_robust.
-- Hardware mainline: local MacBook Pro with Apple M1 Pro and MPS.
-- Evaluation: official DuReader_robust `evaluate.py` with F1 and EM.
-- Submission boundary: source code, documentation, and result summaries in Git;
-  raw data, model checkpoints, caches, and predictions excluded from Git.
+- 任务：抽取式问答 / 机器阅读理解。
+- 数据集：DuReader_robust。
+- 硬件主线：本地 MacBook Pro，Apple M1 Pro，MPS。
+- 评价方式：DuReader_robust 官方 `evaluate.py`，指标为 F1 和 EM。
+- 提交边界：代码、说明文档、实验设计和结果摘要进入 Git；原始数据、模型权重、缓存、预测文件不进入 Git。
 
-## Experiment Matrix
+## 实验矩阵
 
-| Group | Model | Role |
+| 组别 | 模型 | 作用 |
 |---|---|---|
-| A | `uer/chinese_roberta_L-2_H-128` | Tiny low-compute baseline |
-| B | `uer/chinese_roberta_L-4_H-256` | Small model, expected quality/speed middle point |
-| C | `uer/chinese_roberta_L-4_H-512` | Larger local candidate, expected upper local cost point |
+| A | `uer/chinese_roberta_L-2_H-128` | 极小模型，低算力基线 |
+| B | `uer/chinese_roberta_L-4_H-256` | 小模型，观察模型变大后的收益 |
+| C | `uer/chinese_roberta_L-4_H-512` | 本地可承受上限候选 |
 
-`uer/chinese_roberta_L-12_H-768` is out of scope for the first formal local
-experiment. It may be discussed as a future extension or optional 4090D follow-up
-if local results justify more compute.
+`uer/chinese_roberta_L-12_H-768` 不进入第一轮正式本地实验。它可以在论文讨论中作为更大模型或 4090D 扩展方向出现，但不作为当前主实验的一部分。
 
-## Data Plan
+## 数据方案
 
-The experiment proceeds in two passes.
+实验分两步进行。
 
-### Pass 1: Controlled Small-Scale Pre-Experiment
+### Pass 1：小规模正式预实验
 
-- Train split: first 1,000 DuReader_robust training examples.
-- Dev split: first 300 DuReader_robust dev examples.
-- Epochs: 1.
-- Purpose: confirm all three models run with the same pipeline and produce
-  comparable metrics without spending full-training time.
+- 训练集：DuReader_robust train 前 1,000 条样本。
+- 验证集：DuReader_robust dev 前 300 条样本。
+- Epoch：1。
+- 目的：确认三个模型在同一流程下都能稳定运行，并得到可比较的初步 F1、EM 和耗时。
 
-### Pass 2: Main Local Experiment
+### Pass 2：主实验
 
-The main experiment is chosen after Pass 1.
+主实验在 Pass 1 完成后决定。
 
-Default main experiment:
+默认策略：
 
-- Use the best balance model from Pass 1 and the tiny baseline model.
-- Train on either 5,000 examples or full train, depending on observed runtime.
-- Evaluate on full dev.
+- 选择 Pass 1 中速度和效果最平衡的模型，再保留极小模型作为对照。
+- 训练规模在 `train 5000` 和 full train 之间选择。
+- 评价集使用 full dev。
 
-Decision rule:
+决策规则：
 
-- If Pass 1 runtime is manageable and memory is stable, use 5,000 train examples
-  for the main experiment.
-- If 5,000 examples is still fast enough, optionally run full train for the best
-  balance model only.
-- If the largest local candidate is too slow, report its Pass 1 result and keep
-  main experiment to Groups A and B.
+- 如果 Pass 1 运行时间和内存都稳定，主实验先使用 5,000 条训练样本。
+- 如果 5,000 条训练仍然较快，可以只对最平衡模型追加 full train。
+- 如果 C 组模型明显太慢，只保留它的 Pass 1 结果，把主实验集中在 A/B 组。
 
-## Metrics
+## 指标
 
-Each run records:
+每次运行记录：
 
-- F1 from official evaluator.
-- EM from official evaluator.
-- Train examples and dev examples.
-- Number of generated train/eval features.
-- Training wall-clock seconds.
-- Prediction/evaluation wall-clock seconds if measured separately.
-- Total run seconds.
-- Device used: `mps`, `cpu`, or `cuda`.
-- Approximate model artifact size, reported from HuggingFace cache files or saved
-  model directory size when available.
+- 官方 F1。
+- 官方 EM。
+- 训练样本数和验证样本数。
+- 训练特征数和验证特征数。
+- 训练耗时。
+- 推理/评测耗时，如果可以单独测量。
+- 总耗时。
+- 使用设备：`mps`、`cpu` 或 `cuda`。
+- 模型大小，优先从 HuggingFace 缓存文件或保存后的模型目录估算。
 
-## Output Layout
+## 输出目录
 
-Generated artifacts stay outside Git:
+生成文件不进入 Git：
 
 ```text
 outputs/
@@ -91,67 +79,63 @@ outputs/
     └── C_L4_H512_pre/
 ```
 
-Each run directory should contain:
+每个运行目录应包含：
 
 - `metrics.json`
 - `predictions.json`
-- `dev_subset.json` or a reference to the dev source
+- `dev_subset.json` 或 dev 来源说明
 
-Only summarized metrics should be committed, for example:
+只有汇总后的指标进入 Git，例如：
 
 ```text
 docs/results/experiment_summary.md
 ```
 
-`docs/results/experiment_summary.md` should be created only after at least Pass 1
-has completed.
+`docs/results/experiment_summary.md` 只有在至少完成 Pass 1 后才创建。
 
-## Implementation Shape
+## 实现形态
 
-The current `scripts/minimal_qa.py` already proves the end-to-end path. For the
-formal experiment, avoid adding a full `src/` package unless the script becomes
-hard to maintain.
+当前 `scripts/minimal_qa.py` 已经证明端到端链路能跑通。正式实验阶段优先保持轻量，不急着引入完整 `src/` 包结构。
 
-Expected implementation changes:
+预期实现方式：
 
-- Extend `scripts/minimal_qa.py` or add one focused `scripts/run_experiment.py`.
-- Add CLI options for model group, run name, train size, dev size, and output
-  directory.
-- Write a structured `metrics.json` for every run.
-- Keep official evaluator invocation unchanged.
-- Keep unit tests on pure helper functions.
+- 扩展 `scripts/minimal_qa.py`，或新增一个聚焦的 `scripts/run_experiment.py`。
+- 增加模型组别、运行名、训练规模、验证规模、输出目录等 CLI 参数。
+- 每次运行写入结构化 `metrics.json`。
+- 官方评测调用方式保持不变。
+- 单元测试继续覆盖纯函数，例如 span 对齐和答案抽取。
 
-## Non-Goals
+## 常见误解澄清：本阶段范围外
 
-- Do not optimize for leaderboard score.
-- Do not rent 4090D in this stage.
-- Do not add LoRA, quantization, or RAG yet.
-- Do not compare against CMRC2018 in code.
-- Do not commit model weights, downloaded datasets, or generated predictions.
+以下内容只是**当前本地小模型正式实验阶段**不做，不代表整个 DuReader_robust 项目永久排除。完成基线实验后，如果时间和算力允许，可以重新评估是否作为扩展实验加入。
 
-## Risks and Mitigations
+- 本阶段不租 4090D 做高算力训练。
+- 本阶段不加入 LoRA、量化或其他高效微调/压缩方法。
+- 本阶段不构建 RAG 系统。
+- 本阶段不以 leaderboard 排名为优化目标。
+- 本阶段不在代码里加入 CMRC2018 对比。
+- 不提交模型权重、下载的数据集或生成的预测文件。
 
-| Risk | Mitigation |
+这样限制范围的原因是：本论文主线是“本地低算力小模型中文 QA”。如果同时加入 4090D、LoRA、量化、RAG 或冲榜调参，实验变量会过多，论文很难判断到底是模型规模、训练技巧、硬件条件还是任务形式带来了差异。
+
+## 风险和应对
+
+| 风险 | 应对 |
 |---|---|
-| MPS runtime or memory instability | Start with Pass 1 and fall back to smaller train sizes |
-| Scores too low after 1 epoch | Treat Pass 1 as pre-experiment; increase data/epoch only for main run |
-| Large model too slow locally | Keep Group C as local upper-bound evidence, not mandatory main model |
-| Metrics vary due random seed | Use fixed `--seed 42` for formal runs |
-| Generated files accidentally enter Git | Keep `outputs/`, `data/raw/`, and checkpoints ignored |
+| MPS 运行或内存不稳定 | 先跑 Pass 1，必要时缩小训练样本数 |
+| 1 个 epoch 分数较低 | 把 Pass 1 视为预实验，主实验再增加数据或 epoch |
+| 较大模型本地太慢 | C 组只作为本地上限证据，不强制进入主实验 |
+| 指标受随机种子影响 | 正式实验固定 `--seed 42` |
+| 生成文件误入 Git | 保持 `outputs/`、`data/raw/` 和模型文件被忽略 |
 
-## Paper Framing
+## 论文写法
 
-The experiment supports this paper argument:
+这个实验支撑的论文论点是：
 
-> For Chinese extractive QA in realistic search-style data, small pretrained
-> language models can be evaluated reproducibly on local hardware. The central
-> trade-off is not only F1/EM, but also runtime and model size under low-compute
-> constraints.
+> 面向真实搜索风格中文抽取式 QA 数据，较小规模的预训练语言模型可以在本地硬件上完成可复现实验；实验重点不仅是 F1/EM，也包括低算力约束下的运行时间和模型大小。
 
-Newer QA directions such as generative QA and temporal RAG should remain in the
-related-work/background section, not in the implementation scope.
+生成式 QA、时间敏感 QA、RAG 等更新方向放在研究背景和技术现状中讨论，不进入当前实现范围。
 
-## Approval Gate
+## 审批关口
 
-Implementation should not start until this design is reviewed and approved. The
-next step after approval is a writing-plans implementation plan for Pass 1.
+实现前需要先审阅并确认本设计。确认后，下一步才是为 Pass 1 编写 implementation plan。

@@ -1,12 +1,13 @@
-# Scripts
+# 脚本目录
 
-This directory starts as the command entry point for exploratory work.
+这个目录存放当前阶段的命令入口。项目还在实验探索期，所以先保持脚本化，不急着拆成复杂包结构。
 
-Expected first scripts:
+当前脚本：
 
-- `inspect_dureader.py`: download DuReader_robust, summarize split statistics,
-  and verify the official dev-set F1/EM evaluator
-- `minimal_qa.py`: run a tiny model training/prediction/evaluation chain for
-  workflow verification
-- minimal baseline
-- model fine-tuning
+- `inspect_dureader.py`：下载 DuReader_robust，统计数据划分，并验证官方 dev 集 F1/EM 评测脚本。
+- `minimal_qa.py`：运行极小规模的模型训练、预测、评测链路，用于确认流程能跑通。
+
+后续可能新增：
+
+- 正式实验运行脚本。
+- 实验结果汇总脚本。

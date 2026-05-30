@@ -1,8 +1,8 @@
-# Data Directory
+# 数据目录
 
-Raw and processed datasets are intentionally excluded from Git.
+原始数据和处理后的数据缓存不进入 Git。
 
-Planned layout after download:
+下载后的目录规划：
 
 ```text
 data/
@@ -11,15 +11,12 @@ data/
 └── processed/
 ```
 
-Use `data/raw/` for the official DuReader_robust files and `data/processed/`
-for derived caches if needed. Keep dataset download links and commands in the
-project README or scripts instead of committing large data files.
+`data/raw/` 用于保存官方 DuReader_robust 文件，`data/processed/` 用于保存后续可能生成的处理缓存。不要把大数据文件提交到仓库；数据下载地址和命令写在 README 或脚本中。
 
-Official data archive used by `scripts/inspect_dureader.py`:
+`scripts/inspect_dureader.py` 使用的官方数据包：
 
 ```text
 https://bj.bcebos.com/paddlenlp/datasets/dureader_robust-data.tar.gz
 ```
 
-The downloaded archive and extracted files are ignored by Git through
-`data/raw/`.
+下载的压缩包和解压后的数据都通过 `.gitignore` 中的 `data/raw/` 排除。
