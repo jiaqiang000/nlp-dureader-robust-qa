@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+
+# Data and generated artifacts
+data/raw/
+data/processed/
+outputs/
+models/
+logs/
+
+# Model checkpoints and large binary artifacts
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Notebook/runtime caches
+.ipynb_checkpoints/
+.cache/
