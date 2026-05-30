@@ -73,9 +73,51 @@ Run unit tests:
 python -m unittest discover -s tests -v
 ```
 
+## Minimal QA Chain Verification
+
+Run a tiny end-to-end model path:
+
+```bash
+python scripts/minimal_qa.py \
+  --train-samples 80 \
+  --eval-samples 30 \
+  --epochs 1 \
+  --batch-size 8 \
+  --max-length 256 \
+  --seed 42 \
+  --output-dir outputs/minimal_qa
+```
+
+This command loads `uer/chinese_roberta_L-2_H-128`, trains only on a tiny subset,
+predicts on 30 dev examples, and evaluates with the official DuReader_robust
+script. Its result is a chain verification, not a formal paper result. The QA
+head is randomly initialized, so tiny-subset scores should not be interpreted as
+stable model quality.
+
+Observed local sanity run:
+
+```json
+{
+  "model_name": "uer/chinese_roberta_L-2_H-128",
+  "device": "mps",
+  "train_examples": 80,
+  "eval_examples": 30,
+  "epochs": 1,
+  "seed": 42,
+  "official_metrics": {
+    "F1": "8.068",
+    "EM": "0.000",
+    "TOTAL": 30,
+    "SKIP": 0
+  }
+}
+```
+
+Generated files under `outputs/` are ignored by Git.
+
 ## Planned Workflow
 
-1. Build a minimal dev-set baseline.
-2. Fine-tune one small pretrained QA model.
+1. Expand from tiny chain verification to a controlled small-model experiment.
+2. Fine-tune one small pretrained QA model on a larger subset or full train set.
 3. Compare accuracy, speed, and model size.
 4. Summarize results for the course paper and presentation.

@@ -6,6 +6,7 @@ Expected first scripts:
 
 - `inspect_dureader.py`: download DuReader_robust, summarize split statistics,
   and verify the official dev-set F1/EM evaluator
-- official evaluation verification
+- `minimal_qa.py`: run a tiny model training/prediction/evaluation chain for
+  workflow verification
 - minimal baseline
 - model fine-tuning
