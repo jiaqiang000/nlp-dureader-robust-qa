@@ -125,6 +125,28 @@ python scripts/minimal_qa.py \
 docs/superpowers/specs/2026-05-31-local-small-model-experiment-design.md
 ```
 
+## Pass 1 模型筛选命令
+
+Pass 1 是模型筛选预实验，不是最终主实验。默认配置为 `train 1000 / dev 300 / epoch 1`。
+
+```bash
+python scripts/run_experiment.py --model-key A_L2_H128
+python scripts/run_experiment.py --model-key B_L4_H256
+python scripts/run_experiment.py --model-key C_L4_H512
+```
+
+每次运行会写入：
+
+```text
+outputs/experiments/<run_name>/
+├── run_config.json
+├── metrics.json
+├── predictions.json
+└── dev_subset.json
+```
+
+这些输出文件不进入 Git。完成 Pass 1 后，再把汇总指标写入 `docs/results/experiment_summary.md`。
+
 ## 常见误解澄清
 
 当前不租 4090D、不做 LoRA/量化/RAG、不追 leaderboard，只是**当前阶段**为了保证本地小模型实验可复现、变量清晰而设定的范围边界，不代表整个 DuReader_robust 课题永久不允许做这些扩展。完成本地基线实验后，如果时间和算力允许，可以再评估是否把其中一项作为论文扩展实验。

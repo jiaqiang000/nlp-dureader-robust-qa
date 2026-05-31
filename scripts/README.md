@@ -6,8 +6,8 @@
 
 - `inspect_dureader.py`：下载 DuReader_robust，统计数据划分，并验证官方 dev 集 F1/EM 评测脚本。
 - `minimal_qa.py`：运行极小规模的模型训练、预测、评测链路，用于确认流程能跑通。
+- `run_experiment.py`：正式实验入口，用模型组别、样本规模和运行名管理实验输出。
 
 后续可能新增：
 
-- 正式实验运行脚本。
 - 实验结果汇总脚本。

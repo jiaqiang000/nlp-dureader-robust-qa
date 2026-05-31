@@ -245,6 +245,19 @@ def choose_device() -> str:
     return "cpu"
 
 
+def model_parameter_stats(model: Any) -> Dict[str, Any]:
+    parameters = list(model.parameters())
+    total_parameters = sum(parameter.numel() for parameter in parameters)
+    trainable_parameters = sum(parameter.numel() for parameter in parameters if parameter.requires_grad)
+    parameter_bytes = sum(parameter.numel() * parameter.element_size() for parameter in parameters)
+    return {
+        "total_parameters": int(total_parameters),
+        "trainable_parameters": int(trainable_parameters),
+        "parameter_bytes": int(parameter_bytes),
+        "parameter_size_mb": round(parameter_bytes / 1024 / 1024, 2),
+    }
+
+
 def train_and_predict(args: argparse.Namespace) -> Dict[str, Any]:
     import torch
     from torch.utils.data import DataLoader, Dataset
@@ -275,6 +288,7 @@ def train_and_predict(args: argparse.Namespace) -> Dict[str, Any]:
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    data_start = time.time()
     train_dataset = load_json(args.dataset_dir / "train.json")
     dev_dataset = load_json(args.dataset_dir / "dev.json")
     dev_subset = subset_dataset(dev_dataset, args.eval_samples)
@@ -284,12 +298,18 @@ def train_and_predict(args: argparse.Namespace) -> Dict[str, Any]:
     train_examples = flatten_examples(train_dataset, args.train_samples)
     dev_examples = flatten_examples(dev_subset, args.eval_samples)
     contexts_by_id = {example["id"]: example["context"] for example in dev_examples}
+    data_seconds = round(time.time() - data_start, 2)
 
+    model_load_start = time.time()
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     model = AutoModelForQuestionAnswering.from_pretrained(args.model_name)
+    model_stats = model_parameter_stats(model)
+    model_load_seconds = round(time.time() - model_load_start, 2)
 
+    feature_start = time.time()
     train_features = prepare_train_features(train_examples, tokenizer, args.max_length, args.doc_stride)
     eval_features = prepare_eval_features(dev_examples, tokenizer, args.max_length, args.doc_stride)
+    feature_seconds = round(time.time() - feature_start, 2)
 
     device = choose_device()
     model.to(device)
@@ -304,6 +324,7 @@ def train_and_predict(args: argparse.Namespace) -> Dict[str, Any]:
     )
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 
+    training_start = time.time()
     last_loss = None
     for _epoch in range(args.epochs):
         for batch in loader:
@@ -314,7 +335,9 @@ def train_and_predict(args: argparse.Namespace) -> Dict[str, Any]:
             optimizer.step()
             optimizer.zero_grad()
             last_loss = float(loss.detach().cpu())
+    training_seconds = round(time.time() - training_start, 2)
 
+    prediction_start = time.time()
     model.eval()
     eval_loader = DataLoader(
         FeatureDataset(eval_features, include_labels=False),
@@ -346,8 +369,11 @@ def train_and_predict(args: argparse.Namespace) -> Dict[str, Any]:
     }
     predictions_path = output_dir / "predictions.json"
     save_json(predictions_path, predictions)
+    prediction_seconds = round(time.time() - prediction_start, 2)
 
+    evaluation_start = time.time()
     metrics = evaluate_official(dev_subset_path, predictions_path, args.dataset_dir / "evaluate.py")
+    evaluation_seconds = round(time.time() - evaluation_start, 2)
     result = {
         "model_name": args.model_name,
         "device": device,
@@ -361,6 +387,13 @@ def train_and_predict(args: argparse.Namespace) -> Dict[str, Any]:
         "doc_stride": args.doc_stride,
         "seed": args.seed,
         "last_train_loss": last_loss,
+        "model_parameter_stats": model_stats,
+        "data_seconds": data_seconds,
+        "model_load_seconds": model_load_seconds,
+        "feature_seconds": feature_seconds,
+        "training_seconds": training_seconds,
+        "prediction_seconds": prediction_seconds,
+        "evaluation_seconds": evaluation_seconds,
         "seconds": round(time.time() - start_time, 2),
         "official_metrics": metrics,
     }

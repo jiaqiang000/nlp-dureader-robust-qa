@@ -53,6 +53,22 @@ class MinimalQaTest(unittest.TestCase):
 
         self.assertEqual(answer, "大韩民国")
 
+    def test_model_parameter_stats_counts_total_trainable_and_bytes(self):
+        import torch
+
+        model = torch.nn.Sequential(
+            torch.nn.Linear(3, 2, bias=False),
+            torch.nn.Linear(2, 1, bias=True),
+        )
+        model[1].bias.requires_grad = False
+
+        stats = minimal_qa.model_parameter_stats(model)
+
+        self.assertEqual(stats["total_parameters"], 9)
+        self.assertEqual(stats["trainable_parameters"], 8)
+        self.assertEqual(stats["parameter_bytes"], 36)
+        self.assertEqual(stats["parameter_size_mb"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
