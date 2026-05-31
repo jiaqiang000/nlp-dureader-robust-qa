@@ -1,20 +1,32 @@
-# Pass 1 Experiment Implementation Plan
+# Pass 1 实验运行器实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **给后续执行者的要求：** 实现本计划时，使用 `superpowers:subagent-driven-development` 或 `superpowers:executing-plans`，按任务逐步执行。每个步骤用 checkbox 追踪。
 
-**Goal:** Add a formal Pass 1 model-screening experiment runner for DuReader_robust while keeping `scripts/minimal_qa.py` as the minimal chain verification entry.
+**目标：** 新增一个正式实验入口，用来跑 DuReader_robust 的 Pass 1 模型筛选预实验；同时保留 `scripts/minimal_qa.py` 作为最小链路验证脚本。
 
-**Architecture:** `scripts/minimal_qa.py` remains the shared QA training/evaluation implementation. A new `scripts/run_experiment.py` wraps it with experiment naming, model-group selection, output-directory rules, and Pass 1 metadata. Tests cover pure helper behavior; a tiny smoke run verifies the full chain without treating smoke metrics as paper results.
+**核心架构：** 不重写一套问答训练代码。已有的 `scripts/minimal_qa.py` 继续负责数据加载、特征构建、训练、预测和官方评测；新增 `scripts/run_experiment.py` 负责正式实验的模型组别、运行名称、输出目录和元数据记录。
 
-**Tech Stack:** Python 3.9+, PyTorch, Transformers, DuReader_robust official `evaluate.py`, `unittest`.
+**技术栈：** Python 3.9+、PyTorch、Transformers、DuReader_robust 官方 `evaluate.py`、`unittest`。
 
 ---
 
-## Scope
+## 先解释：这个计划到底是什么
 
-Pass 1 is a model-screening pre-experiment, not the paper's final main experiment.
+这个文件不是实验结果，也不是已经跑完了 Pass 1。
 
-The implementation must make these commands possible after user confirmation:
+它只是下一阶段“怎么写代码”的实施清单。也就是说：
+
+- 现在已经有的是：实验设计、最小 QA 链路、这个实现计划。
+- 下一步要做的是：按这个计划写 `scripts/run_experiment.py`。
+- 写完以后先跑一个很小的 smoke test，确认新脚本能工作。
+- smoke test 通过后，再问你是否开始真正跑完整 Pass 1。
+- 真正的 Pass 1 是 A/B/C 三个模型各跑一次 `train 1000 / dev 300 / epoch 1`。
+
+Pass 1 仍然不是论文最终主实验。它是模型筛选预实验，用来决定 Pass 2 主实验该扩大哪个模型和训练规模。
+
+## 本阶段范围
+
+实现完成后，下面三条命令应该可以使用：
 
 ```bash
 .venv/bin/python scripts/run_experiment.py --model-key A_L2_H128
@@ -22,51 +34,58 @@ The implementation must make these commands possible after user confirmation:
 .venv/bin/python scripts/run_experiment.py --model-key C_L4_H512
 ```
 
-By default each command uses:
+默认配置是：
 
-- `train_samples = 1000`
-- `eval_samples = 300`
-- `epochs = 1`
-- `batch_size = 8`
-- `max_length = 256`
-- `doc_stride = 64`
-- `learning_rate = 3e-5`
-- `seed = 42`
-- `output_root = outputs/experiments`
+- 训练样本：`train_samples = 1000`
+- 验证样本：`eval_samples = 300`
+- 训练轮数：`epochs = 1`
+- 批大小：`batch_size = 8`
+- 最大长度：`max_length = 256`
+- 滑动窗口步长：`doc_stride = 64`
+- 学习率：`learning_rate = 3e-5`
+- 随机种子：`seed = 42`
+- 输出目录：`outputs/experiments`
 
-Generated model outputs, predictions, subsets, and metrics stay under `outputs/` and do not enter Git.
+生成的预测文件、模型输出、数据子集和指标 JSON 都放在 `outputs/` 下面，不提交到 Git。
 
-## File Structure
+## 文件分工
 
-- Modify `scripts/minimal_qa.py`
-  - Keep the existing CLI behavior for tiny chain verification.
-  - Add model parameter statistics.
-  - Add phase-level timing fields to `metrics.json`.
-- Create `scripts/run_experiment.py`
-  - Formal experiment entrypoint.
-  - Maps short model keys to HuggingFace model names.
-  - Writes `run_config.json`.
-  - Calls `minimal_qa.train_and_predict`.
-  - Rewrites `metrics.json` with experiment metadata.
-- Modify `tests/test_minimal_qa.py`
-  - Add a pure unit test for parameter statistics.
-- Create `tests/test_run_experiment.py`
-  - Test model-key resolution, run-name construction, output directory construction, and training-args construction.
-- Modify `README.md`
-  - Add Pass 1 command examples and clarify that Pass 1 is screening, not the final main experiment.
-- Modify `scripts/README.md`
-  - Document the new formal experiment script.
+- 修改 `scripts/minimal_qa.py`
+  - 保留原来的最小链路验证功能。
+  - 增加模型参数量统计。
+  - 增加分阶段耗时统计，例如数据加载、模型加载、特征构建、训练、预测、官方评测。
 
-## Task 1: Add Model Size And Phase Timing To `minimal_qa.py`
+- 新增 `scripts/run_experiment.py`
+  - 作为正式实验入口。
+  - 把 `A_L2_H128`、`B_L4_H256`、`C_L4_H512` 映射到 HuggingFace 模型名。
+  - 自动生成运行名称和输出目录。
+  - 写入 `run_config.json`。
+  - 调用 `minimal_qa.train_and_predict()` 复用已有训练链路。
+  - 在 `metrics.json` 里补充实验阶段、模型组别、运行名称等信息。
 
-**Files:**
+- 修改 `tests/test_minimal_qa.py`
+  - 增加一个模型参数量统计的纯函数测试。
 
-- Modify: `scripts/minimal_qa.py`
-- Modify: `tests/test_minimal_qa.py`
+- 新增 `tests/test_run_experiment.py`
+  - 测试模型组别解析、运行名称生成、输出目录生成、训练参数构造。
 
-- [ ] **Step 1: Write the failing parameter-statistics test**
+- 修改 `README.md`
+  - 增加 Pass 1 模型筛选命令。
+  - 明确 Pass 1 不是最终主实验。
 
-Add this test method to `tests/test_minimal_qa.py` inside `MinimalQaTest`:
+- 修改 `scripts/README.md`
+  - 说明 `run_experiment.py` 是正式实验入口。
+
+## 任务 1：给 `minimal_qa.py` 增加模型大小和分阶段耗时
+
+**涉及文件：**
+
+- 修改：`scripts/minimal_qa.py`
+- 修改：`tests/test_minimal_qa.py`
+
+### Step 1：先写失败测试
+
+在 `tests/test_minimal_qa.py` 的 `MinimalQaTest` 类里添加：
 
 ```python
     def test_model_parameter_stats_counts_total_trainable_and_bytes(self):
@@ -86,19 +105,17 @@ Add this test method to `tests/test_minimal_qa.py` inside `MinimalQaTest`:
         self.assertEqual(stats["parameter_size_mb"], 0.0)
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
-
-Run:
+运行：
 
 ```bash
 .venv/bin/python -m unittest tests.test_minimal_qa.MinimalQaTest.test_model_parameter_stats_counts_total_trainable_and_bytes -v
 ```
 
-Expected: FAIL with `AttributeError: module 'minimal_qa' has no attribute 'model_parameter_stats'`.
+预期结果：失败，报错原因是 `minimal_qa` 里还没有 `model_parameter_stats`。
 
-- [ ] **Step 3: Add the minimal parameter-statistics implementation**
+### Step 2：实现模型参数量统计函数
 
-Add this function to `scripts/minimal_qa.py` after `choose_device()`:
+在 `scripts/minimal_qa.py` 的 `choose_device()` 后面添加：
 
 ```python
 def model_parameter_stats(model: Any) -> Dict[str, Any]:
@@ -114,103 +131,21 @@ def model_parameter_stats(model: Any) -> Dict[str, Any]:
     }
 ```
 
-- [ ] **Step 4: Add phase timing and parameter stats to `train_and_predict`**
+这个函数用于论文里的“模型大小”指标，不依赖训练结果。
 
-In `scripts/minimal_qa.py`, update the body of `train_and_predict` with these timing boundaries:
+### Step 3：给训练链路增加分阶段耗时
 
-```python
-    start_time = time.time()
-    output_dir = args.output_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
+在 `train_and_predict()` 里增加这些计时字段：
 
-    data_start = time.time()
-    train_dataset = load_json(args.dataset_dir / "train.json")
-    dev_dataset = load_json(args.dataset_dir / "dev.json")
-    dev_subset = subset_dataset(dev_dataset, args.eval_samples)
-    dev_subset_path = output_dir / "dev_subset.json"
-    save_json(dev_subset_path, dev_subset)
+- `data_seconds`：读取数据、切分 dev 子集、展平样本耗时。
+- `model_load_seconds`：加载 tokenizer 和模型耗时。
+- `feature_seconds`：构造训练/验证特征耗时。
+- `training_seconds`：训练耗时。
+- `prediction_seconds`：模型预测和答案抽取耗时。
+- `evaluation_seconds`：调用官方评测脚本耗时。
+- `seconds`：保留已有总耗时字段。
 
-    train_examples = flatten_examples(train_dataset, args.train_samples)
-    dev_examples = flatten_examples(dev_subset, args.eval_samples)
-    contexts_by_id = {example["id"]: example["context"] for example in dev_examples}
-    data_seconds = round(time.time() - data_start, 2)
-
-    model_load_start = time.time()
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-    model = AutoModelForQuestionAnswering.from_pretrained(args.model_name)
-    model_stats = model_parameter_stats(model)
-    model_load_seconds = round(time.time() - model_load_start, 2)
-
-    feature_start = time.time()
-    train_features = prepare_train_features(train_examples, tokenizer, args.max_length, args.doc_stride)
-    eval_features = prepare_eval_features(dev_examples, tokenizer, args.max_length, args.doc_stride)
-    feature_seconds = round(time.time() - feature_start, 2)
-```
-
-Wrap the training loop with:
-
-```python
-    training_start = time.time()
-    last_loss = None
-    for _epoch in range(args.epochs):
-        for batch in loader:
-            batch = {key: value.to(device) for key, value in batch.items()}
-            outputs = model(**batch)
-            loss = outputs.loss
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-            last_loss = float(loss.detach().cpu())
-    training_seconds = round(time.time() - training_start, 2)
-```
-
-Wrap prediction and answer extraction with:
-
-```python
-    prediction_start = time.time()
-    model.eval()
-    eval_loader = DataLoader(
-        FeatureDataset(eval_features, include_labels=False),
-        batch_size=args.batch_size,
-        shuffle=False,
-    )
-    predicted_features: List[Dict[str, Any]] = []
-    feature_offset = 0
-    with torch.no_grad():
-        for batch in eval_loader:
-            batch_on_device = {key: value.to(device) for key, value in batch.items()}
-            outputs = model(**batch_on_device)
-            start_logits = outputs.start_logits.detach().cpu().tolist()
-            end_logits = outputs.end_logits.detach().cpu().tolist()
-            for row_index in range(len(start_logits)):
-                feature = dict(eval_features[feature_offset + row_index])
-                feature["start_logits"] = start_logits[row_index]
-                feature["end_logits"] = end_logits[row_index]
-                predicted_features.append(feature)
-            feature_offset += len(start_logits)
-
-    features_by_example: Dict[str, List[Dict[str, Any]]] = {}
-    for feature in predicted_features:
-        features_by_example.setdefault(feature["example_id"], []).append(feature)
-
-    predictions = {
-        example_id: pick_best_answer(contexts_by_id[example_id], features)
-        for example_id, features in features_by_example.items()
-    }
-    predictions_path = output_dir / "predictions.json"
-    save_json(predictions_path, predictions)
-    prediction_seconds = round(time.time() - prediction_start, 2)
-```
-
-Wrap official evaluation with:
-
-```python
-    evaluation_start = time.time()
-    metrics = evaluate_official(dev_subset_path, predictions_path, args.dataset_dir / "evaluate.py")
-    evaluation_seconds = round(time.time() - evaluation_start, 2)
-```
-
-Add these fields to the `result` dictionary:
+同时在 `metrics.json` 里加入：
 
 ```python
         "model_parameter_stats": model_stats,
@@ -222,28 +157,26 @@ Add these fields to the `result` dictionary:
         "evaluation_seconds": evaluation_seconds,
 ```
 
-Keep the existing `"seconds": round(time.time() - start_time, 2)` field for backward compatibility.
+### Step 4：验证任务 1
 
-- [ ] **Step 5: Run the focused test and verify it passes**
-
-Run:
+运行：
 
 ```bash
 .venv/bin/python -m unittest tests.test_minimal_qa.MinimalQaTest.test_model_parameter_stats_counts_total_trainable_and_bytes -v
 ```
 
-Expected: PASS.
+预期结果：通过。
 
-## Task 2: Add Formal Experiment Runner
+## 任务 2：新增正式实验入口 `run_experiment.py`
 
-**Files:**
+**涉及文件：**
 
-- Create: `scripts/run_experiment.py`
-- Create: `tests/test_run_experiment.py`
+- 新增：`scripts/run_experiment.py`
+- 新增：`tests/test_run_experiment.py`
 
-- [ ] **Step 1: Write failing tests for the experiment runner helpers**
+### Step 1：先写失败测试
 
-Create `tests/test_run_experiment.py`:
+创建 `tests/test_run_experiment.py`：
 
 ```python
 import argparse
@@ -320,19 +253,17 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: Run the new tests and verify they fail**
-
-Run:
+运行：
 
 ```bash
 .venv/bin/python -m unittest tests.test_run_experiment -v
 ```
 
-Expected: FAIL because `scripts/run_experiment.py` does not exist.
+预期结果：失败，因为 `scripts/run_experiment.py` 还不存在。
 
-- [ ] **Step 3: Create `scripts/run_experiment.py`**
+### Step 2：实现 `scripts/run_experiment.py`
 
-Create `scripts/run_experiment.py`:
+创建 `scripts/run_experiment.py`：
 
 ```python
 #!/usr/bin/env python3
@@ -464,26 +395,26 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 4: Run the new tests and verify they pass**
+### Step 3：验证任务 2
 
-Run:
+运行：
 
 ```bash
 .venv/bin/python -m unittest tests.test_run_experiment -v
 ```
 
-Expected: PASS.
+预期结果：通过。
 
-## Task 3: Document The Formal Runner
+## 任务 3：更新中文说明文档
 
-**Files:**
+**涉及文件：**
 
-- Modify: `README.md`
-- Modify: `scripts/README.md`
+- 修改：`README.md`
+- 修改：`scripts/README.md`
 
-- [ ] **Step 1: Update `scripts/README.md`**
+### Step 1：更新 `scripts/README.md`
 
-Change the current script list to include:
+脚本列表改成：
 
 ```markdown
 - `inspect_dureader.py`：下载 DuReader_robust，统计数据划分，并验证官方 dev 集 F1/EM 评测脚本。
@@ -491,9 +422,9 @@ Change the current script list to include:
 - `run_experiment.py`：正式实验入口，用模型组别、样本规模和运行名管理实验输出。
 ```
 
-- [ ] **Step 2: Update `README.md` with Pass 1 commands**
+### Step 2：更新 `README.md`
 
-Add this section after the current formal experiment mainline:
+在正式实验主线后加入：
 
 ````markdown
 ## Pass 1 模型筛选命令
@@ -519,35 +450,17 @@ outputs/experiments/<run_name>/
 这些输出文件不进入 Git。完成 Pass 1 后，再把汇总指标写入 `docs/results/experiment_summary.md`。
 ````
 
-- [ ] **Step 3: Check Markdown formatting**
+## 任务 4：实现后如何验证
 
-Run:
-
-```bash
-git diff --check
-```
-
-Expected: no output and exit code 0.
-
-## Task 4: Verify The Implementation
-
-**Files:**
-
-- No new files.
-
-- [ ] **Step 1: Run all unit tests**
-
-Run:
+实现完成后要跑：
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Expected: all tests pass.
+预期结果：所有单元测试通过。
 
-- [ ] **Step 2: Run a tiny smoke experiment**
-
-Run:
+然后跑一个很小的 smoke test：
 
 ```bash
 .venv/bin/python scripts/run_experiment.py \
@@ -561,72 +474,53 @@ Run:
   --run-name smoke_A_L2_H128
 ```
 
-Expected:
+预期结果：
 
-- Command exits with code 0.
-- `outputs/experiments/smoke_A_L2_H128/run_config.json` exists.
-- `outputs/experiments/smoke_A_L2_H128/metrics.json` exists.
-- `metrics.json` includes `stage: "smoke"`, `is_main_experiment: false`, `model_key: "A_L2_H128"`, `official_metrics`, `model_parameter_stats`, and phase timing fields.
+- 命令退出码为 0。
+- 生成 `outputs/experiments/smoke_A_L2_H128/run_config.json`。
+- 生成 `outputs/experiments/smoke_A_L2_H128/metrics.json`。
+- `metrics.json` 里包含：
+  - `stage: "smoke"`
+  - `is_main_experiment: false`
+  - `model_key: "A_L2_H128"`
+  - `official_metrics`
+  - `model_parameter_stats`
+  - 各阶段耗时字段
 
-If model download or network access stalls, follow the repository instruction and run:
+如果模型下载或网络访问卡住，根据仓库规则先运行：
 
 ```bash
 source /Users/luojiaqiang/script/proxy_on.sh
 ```
 
-Then retry the smoke command.
+再重试 smoke test。
 
-- [ ] **Step 3: Confirm ignored outputs are not staged**
+## 任务 5：实现后如何提交
 
-Run:
+只提交代码、测试和文档，不提交 `outputs/`、模型缓存、预测文件或原始数据。
+
+提交前检查：
 
 ```bash
+git diff --check
 git status --short
 ```
 
-Expected: code/docs files may be modified before commit; `outputs/experiments/smoke_A_L2_H128/` must not appear because `outputs/` is ignored.
+确认 `outputs/experiments/smoke_A_L2_H128/` 没有出现在 Git 状态里。
 
-## Task 5: Commit The Implementation
-
-**Files:**
-
-- Stage only code, tests, and documentation.
-
-- [ ] **Step 1: Review changed files**
-
-Run:
-
-```bash
-git diff --stat
-git diff -- scripts/minimal_qa.py scripts/run_experiment.py tests/test_minimal_qa.py tests/test_run_experiment.py README.md scripts/README.md
-```
-
-Expected: changes are limited to the formal experiment runner, metric metadata, tests, and docs.
-
-- [ ] **Step 2: Commit**
-
-Run:
+提交命令：
 
 ```bash
 git add scripts/minimal_qa.py scripts/run_experiment.py tests/test_minimal_qa.py tests/test_run_experiment.py README.md scripts/README.md
 git commit -m "feat: add Pass 1 experiment runner"
-```
-
-Expected: commit succeeds.
-
-- [ ] **Step 3: Push**
-
-Run:
-
-```bash
 git push
 ```
 
-Expected: push succeeds.
+## 实现完成后还不能马上做什么
 
-## After Implementation: Run Pass 1 Only After User Confirmation
+实现并通过 smoke test 后，还不能直接开始完整 Pass 1。
 
-After the implementation commit is pushed, ask before starting the real Pass 1 runs. The real Pass 1 commands are:
+完整 Pass 1 要单独等用户确认，因为下面三条命令会比 smoke test 慢很多：
 
 ```bash
 .venv/bin/python scripts/run_experiment.py --model-key A_L2_H128
@@ -634,6 +528,4 @@ After the implementation commit is pushed, ask before starting the real Pass 1 r
 .venv/bin/python scripts/run_experiment.py --model-key C_L4_H512
 ```
 
-These runs may take noticeably longer than the smoke test. They generate experiment outputs but should not commit raw predictions, model caches, or `outputs/` contents.
-
-After all three Pass 1 runs complete, create a separate results-summary task for `docs/results/experiment_summary.md`.
+三组 Pass 1 全部跑完后，再进入新的阶段：整理 `docs/results/experiment_summary.md`，把 A/B/C 的 F1、EM、耗时、模型大小汇总成论文可用的表格。
